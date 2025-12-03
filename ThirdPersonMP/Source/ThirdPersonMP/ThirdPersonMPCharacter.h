@@ -23,42 +23,40 @@ class AThirdPersonMPCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	/** Camera boom positioning the camera behind the character */
+	// Camera boom positioning the camera behind the character
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* CameraBoom;
+	TObjectPtr<USpringArmComponent> CameraBoom;
 
-	/** Follow camera */
+	// Follow camera
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FollowCamera;
+	TObjectPtr<UCameraComponent> FollowCamera;
 	
 public:
-
-	/** Constructor */
 	AThirdPersonMPCharacter();
 	
 	// Property replication
-	void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 		
-	/** Handles move inputs from either controls or UI interfaces */
+	// Handles move inputs from either controls or UI interfaces
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
-	/** Handles look inputs from either controls or UI interfaces */
+	// Handles look inputs from either controls or UI interfaces
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
+	// Handles jump pressed inputs from either controls or UI interfaces
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpStart();
 
-	/** Handles jump pressed inputs from either controls or UI interfaces */
+	// Handles jump pressed inputs from either controls or UI interfaces 
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
-	/** Returns CameraBoom subobject **/
+	// Returns CameraBoom subobject
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 
-	/** Returns FollowCamera subobject **/
+	// Returns FollowCamera subobject
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	
 	// Getter for max health
@@ -71,32 +69,38 @@ public:
 	
 	// Setter for current health. Clamps the value between 0 nad MaxHealth and calls OnHealthUpdate. Should only be called on the server.
 	UFUNCTION(BlueprintCallable, Category="Health")
-	void SetCurrentHealth(float healthValue);
+	void SetCurrentHealth(float HealthValue);
 	
 	UFUNCTION(BlueprintCallable, Category="Health")
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
 protected:
+	static constexpr float DefaultMaxWalkSpeed = 500.0f;
+	static constexpr float SprintingMaxWalkSpeed = 1000.0f;
 
 	// Jump Input Action
 	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* JumpAction;
+	TObjectPtr<UInputAction> JumpAction;
 
 	// Move Input Action
 	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* MoveAction;
+	TObjectPtr<UInputAction> MoveAction;
+	
+	// Sprint Input Action
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> SprintAction;
 
 	// Look Input Action
 	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* LookAction;
+	TObjectPtr<UInputAction> LookAction;
 
 	// Mouse Look Input Action
 	UPROPERTY(EditAnywhere, Category="Input")
-	UInputAction* MouseLookAction;
+	TObjectPtr<UInputAction> MouseLookAction;
 	
 	// Fire Input Action
 	UPROPERTY(EditAnyWhere, Category="Input")
-	UInputAction* FireAction;
+	TObjectPtr<UInputAction> FireAction;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Health")
 	float MaxHealth;
@@ -125,6 +129,20 @@ protected:
 	// Server function for spawning projectiles.
 	UFUNCTION(Server, Reliable)
 	void HandleFire();
+	
+	UFUNCTION(BlueprintCallable, Category="Gameplay")
+	void StartSprint();
+	
+	UFUNCTION(BlueprintCallable, Category="Gameplay")
+	void StopSprint();
+	
+	UFUNCTION(Server, Reliable)
+	void ServerStartSprint();
+	
+	UFUNCTION(Server, Reliable)
+	void ServerStopSprint();
+	
+	void SetMaxWalkSpeed(float MaxWalkSpeed) const;
 	
 	// A timer handle used for providing the fire rate delay in-between spawns.
 	FTimerHandle FiringTimer;

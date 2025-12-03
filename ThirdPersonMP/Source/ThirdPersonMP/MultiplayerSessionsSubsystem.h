@@ -36,8 +36,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void FindServer(FString ServerName);
 	
-	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
+	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful) const;
 	void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
 	void OnFindSessionsComplete(bool bWasSuccessful);
-	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
+	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result) const;
 };

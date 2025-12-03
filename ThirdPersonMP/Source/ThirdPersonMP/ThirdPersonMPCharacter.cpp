@@ -33,7 +33,7 @@ AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	GetCharacterMovement()->MaxWalkSpeed = DefaultMaxWalkSpeed;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
@@ -87,16 +87,53 @@ void AThirdPersonMPCharacter::StopFire()
 	bIsFiringWeapon = false;
 }
 
+void AThirdPersonMPCharacter::StartSprint()
+{
+	SetMaxWalkSpeed(this->SprintingMaxWalkSpeed);
+	// todo: limit server calls
+	ServerStartSprint();
+}
+
+void AThirdPersonMPCharacter::StopSprint()
+{
+	SetMaxWalkSpeed(this->DefaultMaxWalkSpeed);
+	// todo: limit server calls
+	ServerStopSprint();
+}
+
 void AThirdPersonMPCharacter::HandleFire_Implementation()
 {
-	FVector spawnLocation = GetActorLocation() + (GetActorRotation().Vector()  * 100.0f) + (GetActorUpVector() * 50.0f);
-	FRotator spawnRotation = GetActorRotation();
+	// const FString message = FString::Printf(TEXT("Local role in HandleFire: %d."), GetLocalRole());
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
+
+	const FVector SpawnLocation = GetActorLocation() + (GetActorRotation().Vector()  * 100.0f) + (GetActorUpVector() * 50.0f);
+	const FRotator SpawnRotation = GetActorRotation();
 	
-	FActorSpawnParameters spawnParameters;
-	spawnParameters.Instigator = GetInstigator();
-	spawnParameters.Owner = this;
-	
-	AThirdPersonMPProjectile* spawnedProjectile = GetWorld()->SpawnActor<AThirdPersonMPProjectile>(spawnLocation, spawnRotation, spawnParameters);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Instigator = GetInstigator();
+	SpawnParameters.Owner = this;
+
+	[[maybe_unused]] AThirdPersonMPProjectile* spawnedProjectile = GetWorld()->SpawnActor<AThirdPersonMPProjectile>(SpawnLocation, SpawnRotation, SpawnParameters);
+}
+
+
+void AThirdPersonMPCharacter::ServerStartSprint_Implementation()
+{
+	// const FString message = FString::Printf(TEXT("Local role in ServerStartSprint: %d."), GetLocalRole());
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
+	SetMaxWalkSpeed(SprintingMaxWalkSpeed);
+}
+
+void AThirdPersonMPCharacter::ServerStopSprint_Implementation()
+{
+	// const FString message = FString::Printf(TEXT("Local role in ServerStopSprint: %d."), GetLocalRole());
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
+	SetMaxWalkSpeed(DefaultMaxWalkSpeed);
+}
+
+void AThirdPersonMPCharacter::SetMaxWalkSpeed(const float MaxWalkSpeed) const
+{
+	GetCharacterMovement()->MaxWalkSpeed = MaxWalkSpeed;
 }
 
 void AThirdPersonMPCharacter::OnRep_CurrentHealth() const
@@ -116,7 +153,11 @@ void AThirdPersonMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::Move);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::Look);
-
+		
+		// Sprinting
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &AThirdPersonMPCharacter::StartSprint);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &AThirdPersonMPCharacter::StopSprint);
+		
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::Look);
 		
@@ -132,7 +173,7 @@ void AThirdPersonMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 void AThirdPersonMPCharacter::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
+	const FVector2D MovementVector = Value.Get<FVector2D>();
 
 	// route the input
 	DoMove(MovementVector.X, MovementVector.Y);
@@ -141,7 +182,7 @@ void AThirdPersonMPCharacter::Move(const FInputActionValue& Value)
 void AThirdPersonMPCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
+	const FVector2D LookAxisVector = Value.Get<FVector2D>();
 
 	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
@@ -152,20 +193,20 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 	// Client-specific functionality
 	if (IsLocallyControlled())
 	{
-		const FString healthMessage = FString::Printf(TEXT("You now have %f remaining."), CurrentHealth);
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, healthMessage);
+		const FString HealthMessage = FString::Printf(TEXT("You now have %f remaining."), CurrentHealth);
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, HealthMessage);
 		
 		if (CurrentHealth <= 0)
 		{
-			const FString deathMessage = FString::Printf(TEXT("You have been killed."));
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, deathMessage);
+			const FString DeathMessage = FString::Printf(TEXT("You have been killed."));
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, DeathMessage);
 		}
 	}
 	
 	
 	if (GetLocalRole() == ROLE_Authority)
 	{
-		FString healthMessage = FString::Printf(TEXT("%s now has %f health remaining."), *GetFName().ToString(), CurrentHealth);
+		const FString healthMessage = FString::Printf(TEXT("%s now has %f health remaining."), *GetFName().ToString(), CurrentHealth);
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, healthMessage);
 	}
 	
@@ -175,7 +216,7 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 	*/
 }
 
-void AThirdPersonMPCharacter::DoMove(float Right, float Forward)
+void AThirdPersonMPCharacter::DoMove(const float Right, const float Forward)
 {
 	if (GetController() != nullptr)
 	{
@@ -195,7 +236,7 @@ void AThirdPersonMPCharacter::DoMove(float Right, float Forward)
 	}
 }
 
-void AThirdPersonMPCharacter::DoLook(float Yaw, float Pitch)
+void AThirdPersonMPCharacter::DoLook(const float Yaw, const float Pitch)
 {
 	if (GetController() != nullptr)
 	{
@@ -218,18 +259,18 @@ void AThirdPersonMPCharacter::DoJumpEnd()
 	StopJumping();
 }
 
-void AThirdPersonMPCharacter::SetCurrentHealth(float healthValue)
+void AThirdPersonMPCharacter::SetCurrentHealth(const float HealthValue)
 {
 	if (GetLocalRole() == ROLE_Authority)
 	{ 
-		CurrentHealth = FMath::Clamp(healthValue, 0.0f, MaxHealth);
+		CurrentHealth = FMath::Clamp(HealthValue, 0.0f, MaxHealth);
 		OnHealthUpdate();
 	}
 }
 
-float AThirdPersonMPCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
+float AThirdPersonMPCharacter::TakeDamage(const float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser)
 {
-	float newHealth = CurrentHealth - DamageAmount;
-	SetCurrentHealth(newHealth);
-	return newHealth;
+	const float NewHealth = CurrentHealth - DamageAmount;
+	SetCurrentHealth(NewHealth);
+	return NewHealth;
 }

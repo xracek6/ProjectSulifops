@@ -25,10 +25,9 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem()
 void UMultiplayerSessionsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	PrintString("MSS Initialize");
-	IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
-	if (OnlineSubsystem)
+	if (const IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get())
 	{
-		FString SubsystemName = OnlineSubsystem->GetSubsystemName().ToString();
+		const FString SubsystemName = OnlineSubsystem->GetSubsystemName().ToString();
 		PrintString(SubsystemName);
 		
 		SessionInterface = OnlineSubsystem->GetSessionInterface();
@@ -56,11 +55,10 @@ void UMultiplayerSessionsSubsystem::CreateServer(FString ServerName)
 		PrintString("Server name cannot be empty!");
 		return;
 	}
-	
-	FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(MySessionName);
-	if (ExistingSession)
+
+	if ([[maybe_unused]] FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(MySessionName))
 	{
-		FString Msg = FString::Printf(TEXT("Session with name %s already exists, destroying it"), *MySessionName.ToString());
+		const FString Msg = FString::Printf(TEXT("Session with name %s already exists, destroying it"), *MySessionName.ToString());
 		PrintString(Msg);
 		
 		bCreateServerAfterDestroy = true;
@@ -105,36 +103,36 @@ void UMultiplayerSessionsSubsystem::FindServer(FString ServerName)
 	SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
 }
 
-void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
+void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(const FName SessionName, const bool bWasSuccessful) const
 {
-	if (bWasSuccessful)
-	{
-		PrintString(FString::Printf(TEXT("Successfully created a session with name: %s"), *SessionName.ToString()));
-		GetWorld()->ServerTravel("/Game/ThirdPerson/Lvl_ThirdPerson?listen");
-	} else
+	if (!bWasSuccessful)
 	{
 		PrintString(FString::Printf(TEXT("Failed to create a session with name: %s"), *SessionName.ToString()));
+		return;
 	}
+	
+	PrintString(FString::Printf(TEXT("Successfully created a session with name: %s"), *SessionName.ToString()));
+	GetWorld()->ServerTravel("/Game/ThirdPerson/Lvl_ThirdPerson?listen");
 }
 
-void UMultiplayerSessionsSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
+void UMultiplayerSessionsSubsystem::OnDestroySessionComplete(const FName SessionName, const bool bWasSuccessful)
 {
-	if (bWasSuccessful)
-	{
-		PrintString(FString::Printf(TEXT("Successfully destroyed a session with name: %s"), *SessionName.ToString()));
-		
-		if (bCreateServerAfterDestroy)
-		{
-			bCreateServerAfterDestroy = false;
-			CreateServer(DestroyServerName);
-		}
-	} else
+	if (!bWasSuccessful)
 	{
 		PrintString(FString::Printf(TEXT("Failed to destroy a session with name: %s"), *SessionName.ToString()));
+		return;
+	}
+	
+	PrintString(FString::Printf(TEXT("Successfully destroyed a session with name: %s"), *SessionName.ToString()));
+		
+	if (bCreateServerAfterDestroy)
+	{
+		bCreateServerAfterDestroy = false;
+		CreateServer(DestroyServerName);
 	}
 }
 
-void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
+void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(const bool bWasSuccessful)
 {
 	if (!bWasSuccessful)
 	{
@@ -148,15 +146,14 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		return;
 	}
 	
-	
 	TArray<FOnlineSessionSearchResult> Results = SessionSearch->SearchResults;
 	if (Results.Num() == 0)
 	{
 		PrintString("Zero sessions were found");
 		return;
 	}
-	
-	FString Msg = FString::Printf(TEXT("Found %d sessions"), Results.Num());
+
+	const FString Msg = FString::Printf(TEXT("Found %d sessions"), Results.Num());
 	PrintString(Msg);
 	
 	FOnlineSessionSearchResult* CorrectResult = nullptr;
@@ -171,18 +168,20 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		FString ServerName = "No-name";
 		Result.Session.SessionSettings.Get(FName("SERVER_NAME"), ServerName);
 			
-		if (ServerName.Equals(ServerNameToFind))
+		if (!ServerName.Equals(ServerNameToFind))
 		{
-			CorrectResult = &Result;
-			FString Msg2 = FString::Printf(TEXT("Found server with name: %s"), *ServerName);
-			PrintString(Msg2);
-			break;
+			continue;
 		}
+		
+		CorrectResult = &Result;
+		const FString Msg2 = FString::Printf(TEXT("Found server with name: %s"), *ServerName);
+		PrintString(Msg2);
+		break;
 	}
 	
 	if (CorrectResult == nullptr)
 	{
-		FString Msg3 = FString::Printf(TEXT("Couldn't find server with name: %s"), *ServerNameToFind);
+		const FString Msg3 = FString::Printf(TEXT("Couldn't find server with name: %s"), *ServerNameToFind);
 		PrintString(Msg3);
 		
 		ServerNameToFind = "";
@@ -194,33 +193,30 @@ void UMultiplayerSessionsSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	SessionInterface->JoinSession(0, MySessionName, *CorrectResult);
 }
 
-void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
+void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(const FName SessionName, const EOnJoinSessionCompleteResult::Type Result) const
 {
-	if (Result == EOnJoinSessionCompleteResult::Success)
+	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
-		FString MsgSuccess = FString::Printf(TEXT("Successfully joined session %s"), *SessionName.ToString());
-		PrintString(MsgSuccess);
-		
-		FString Address = "";
-		bool bSuccess = SessionInterface->GetResolvedConnectString(SessionName, Address);
-		if (bSuccess)
-		{
-			FString Msg = FString::Printf(TEXT("Address: %s"), *Address);
-			PrintString(Msg);
-			
-			APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController();
-			if (PlayerController)
-			{
-				PlayerController->ClientTravel(Address, TRAVEL_Absolute);
-			}
-		} else
-		{
-			PrintString("GetResolvedConnectString returned false!");
-		}
-		
-	} else
-	{
-		FString MsgError = FString::Printf(TEXT("OnJoinSessionComplete failed for session with name: %s, error code: %d"), *SessionName.ToString(), Result);
+		const FString MsgError = FString::Printf(TEXT("OnJoinSessionComplete failed for session with name: %s, error code: %d"), *SessionName.ToString(), Result);
 		PrintString(MsgError);
+		return;
+	}
+	
+	const FString MsgSuccess = FString::Printf(TEXT("Successfully joined session %s"), *SessionName.ToString());
+	PrintString(MsgSuccess);
+		
+	FString Address = "";
+	if (!SessionInterface->GetResolvedConnectString(SessionName, Address))
+	{
+		PrintString("GetResolvedConnectString returned false!");
+		return;
+	}
+	
+	const FString Msg = FString::Printf(TEXT("Address: %s"), *Address);
+	PrintString(Msg);
+
+	if (APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController())
+	{
+		PlayerController->ClientTravel(Address, TRAVEL_Absolute);
 	}
 }
