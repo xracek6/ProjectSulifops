@@ -246,6 +246,7 @@ void AThirdPersonMPCharacter::ToggleMenu()
 		FInputModeGameOnly GameInputMode;
 		MyController->SetInputMode(GameInputMode);
 		MyController->SetShowMouseCursor(false);
+		MyController->SetIgnoreMoveInput(false);
 		return;
 	}
 	
@@ -255,6 +256,7 @@ void AThirdPersonMPCharacter::ToggleMenu()
 	Mode.SetWidgetToFocus(Menu->TakeWidget());
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	
+	MyController->SetIgnoreMoveInput(true);
 	MyController->SetInputMode(Mode);
 	MyController->SetShowMouseCursor(true);
 }
