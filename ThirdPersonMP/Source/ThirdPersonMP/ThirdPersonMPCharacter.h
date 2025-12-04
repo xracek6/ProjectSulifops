@@ -102,6 +102,9 @@ protected:
 	UPROPERTY(EditAnyWhere, Category="Input")
 	TObjectPtr<UInputAction> FireAction;
 	
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> OpenMenuAction;
+	
 	UPROPERTY(EditDefaultsOnly, Category="Health")
 	float MaxHealth;
 	
@@ -162,5 +165,7 @@ protected:
 	
 	// Response to health being updated. Called on the server immediately after modification, and on clients in response to a RepNotify
 	void OnHealthUpdate() const;
+	
+	void ToggleMenu();
 };
 

@@ -13,7 +13,10 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "MenuWidget.h"
 #include "ThirdPersonMP.h"
+#include "ThirdPersonMPPlayerController.h"
+#include "Blueprint/UserWidget.h"
 
 AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 {
@@ -73,13 +76,15 @@ void AThirdPersonMPCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeP
 
 void AThirdPersonMPCharacter::StartFire()
 {
-	if (!bIsFiringWeapon)
+	if (bIsFiringWeapon)
 	{
-		bIsFiringWeapon = true;
-		UWorld* World = GetWorld();
-		World->GetTimerManager().SetTimer(FiringTimer, this, &AThirdPersonMPCharacter::StopFire, FireRate, false);
-		HandleFire();
+		return;
 	}
+	
+	bIsFiringWeapon = true;
+	const UWorld* World = GetWorld();
+	World->GetTimerManager().SetTimer(FiringTimer, this, &AThirdPersonMPCharacter::StopFire, FireRate, false);
+	HandleFire();
 }
 
 void AThirdPersonMPCharacter::StopFire()
@@ -163,6 +168,8 @@ void AThirdPersonMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		
 		// Firing projectiles
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::StartFire);
+		
+		EnhancedInputComponent->BindAction(OpenMenuAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::ToggleMenu);
 	}
 	else
 	{
@@ -204,7 +211,7 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 	}
 	
 	
-	if (GetLocalRole() == ROLE_Authority)
+	if (HasAuthority())
 	{
 		const FString healthMessage = FString::Printf(TEXT("%s now has %f health remaining."), *GetFName().ToString(), CurrentHealth);
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, healthMessage);
@@ -214,6 +221,42 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 	/*
 		Any special functionality that should occur as a result of damage or death should be placed here.
 	*/
+}
+
+void AThirdPersonMPCharacter::ToggleMenu()
+{
+	AThirdPersonMPPlayerController* MyController = Cast<AThirdPersonMPPlayerController>(GetController());
+	
+	if (MyController == nullptr)
+	{
+		const FString Message = FString::Printf(TEXT("Controller is null in AThirdPersonMPCharacter::OpenMenu()"));
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
+		return;
+	}
+	
+	const FString Message = FString::Printf(TEXT("Controller is valid in AThirdPersonMPCharacter::OpenMenu()"));
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
+
+	const TObjectPtr<UUserWidget> Menu = MyController->GetMenuWidget();
+	
+	if (Menu->IsInViewport())
+	{
+		Menu->RemoveFromParent();
+
+		FInputModeGameOnly GameInputMode;
+		MyController->SetInputMode(GameInputMode);
+		MyController->SetShowMouseCursor(false);
+		return;
+	}
+	
+	Menu->AddToViewport(0);
+	
+	FInputModeGameAndUI Mode;
+	Mode.SetWidgetToFocus(Menu->TakeWidget());
+	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	
+	MyController->SetInputMode(Mode);
+	MyController->SetShowMouseCursor(true);
 }
 
 void AThirdPersonMPCharacter::DoMove(const float Right, const float Forward)

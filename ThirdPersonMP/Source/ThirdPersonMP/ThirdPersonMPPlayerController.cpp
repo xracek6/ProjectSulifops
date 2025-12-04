@@ -12,7 +12,9 @@
 void AThirdPersonMPPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
+	MenuWidget = CreateWidget<UUserWidget>(this, MenuWidgetClass);
+	
 	// only spawn touch controls on local player controllers
 	if (SVirtualJoystick::ShouldDisplayTouchInterface() && IsLocalPlayerController())
 	{

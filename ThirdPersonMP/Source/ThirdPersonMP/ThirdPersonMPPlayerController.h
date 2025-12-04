@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MenuWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "ThirdPersonMPPlayerController.generated.h"
 
@@ -17,7 +18,13 @@ UCLASS(abstract)
 class AThirdPersonMPPlayerController : public APlayerController
 {
 	GENERATED_BODY()
-	
+
+public:
+	[[nodiscard]] TObjectPtr<UUserWidget> GetMenuWidget() const
+	{
+		return MenuWidget;
+	}
+
 protected:
 
 	/** Input Mapping Contexts */
@@ -34,6 +41,12 @@ protected:
 
 	/** Pointer to the mobile controls widget */
 	TObjectPtr<UUserWidget> MobileControlsWidget;
+	
+	UPROPERTY(EditAnywhere, Category ="Menu")
+	TSubclassOf<UUserWidget> MenuWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> MenuWidget;
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
