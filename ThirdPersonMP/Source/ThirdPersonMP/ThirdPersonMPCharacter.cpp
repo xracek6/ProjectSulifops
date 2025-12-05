@@ -22,11 +22,6 @@ AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
-	// Don't rotate when the controller rotates. Let that just affect the camera.
-	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
-	bUseControllerRotationRoll = false;
 
 	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -41,17 +36,24 @@ AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
 	CameraBoom->TargetArmLength = 400.0f;
 	CameraBoom->bUsePawnControlRotation = true;
-
+	
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
-
+	
+	// Create first person camera
+	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	FirstPersonCamera->SetupAttachment(GetMesh());
+	
+	SetThirdPersonCamera();
+	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	
@@ -64,6 +66,36 @@ AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 	// Initialize fire rate.
 	FireRate = 0.15f;
 	bIsFiringWeapon = false;
+}
+
+// FirstPersonCamera gets attached to the "head" socket of the Mesh component in this method instead of constructor because sockets are not initialized yet in constructor
+void AThirdPersonMPCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	
+	if (GetMesh())
+	{
+		TArray<FName> SocketNames = GetMesh()->GetAllSocketNames();
+		UE_LOG(LogThirdPersonMP, Warning, TEXT("Mesh exists obtaining all sockets:"));
+		for (const FName& SocketName : SocketNames)
+		{
+
+			UE_LOG(LogThirdPersonMP, Warning, TEXT("Socket: %s"), *SocketName.ToString());
+		}
+		if (SocketNames.Num() == 0)
+		{
+			UE_LOG(LogThirdPersonMP, Warning, TEXT("No sockets"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogThirdPersonMP, Warning, TEXT("No Mesh"));
+	}
+	
+	FirstPersonCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("head"));
+	// Position the camera slightly above the eyes and rotate it to behind the player's head
+	FirstPersonCamera->SetRelativeLocationAndRotation(FVector(2.8f, 8.9f, 0.0f), FRotator(0.0f, 90.0f, -90.0f));
+	FirstPersonCamera->bUsePawnControlRotation = true;
 }
 
 void AThirdPersonMPCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -169,7 +201,11 @@ void AThirdPersonMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		// Firing projectiles
 		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::StartFire);
 		
+		// Menu
 		EnhancedInputComponent->BindAction(OpenMenuAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::ToggleMenu);
+		
+		// Camera toggle
+		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::ToggleCamera);
 	}
 	else
 	{
@@ -234,8 +270,8 @@ void AThirdPersonMPCharacter::ToggleMenu()
 		return;
 	}
 	
-	const FString Message = FString::Printf(TEXT("Controller is valid in AThirdPersonMPCharacter::OpenMenu()"));
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
+	// const FString Message = FString::Printf(TEXT("Controller is valid in AThirdPersonMPCharacter::OpenMenu()"));
+	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
 
 	const TObjectPtr<UUserWidget> Menu = MyController->GetMenuWidget();
 	
@@ -261,34 +297,63 @@ void AThirdPersonMPCharacter::ToggleMenu()
 	MyController->SetShowMouseCursor(true);
 }
 
+void AThirdPersonMPCharacter::ToggleCamera()
+{
+	FirstPersonCamera->IsActive() ? SetThirdPersonCamera() : SetFirstPersonCamera();
+}
+
+void AThirdPersonMPCharacter::SetFirstPersonCamera()
+{
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = true;
+	bUseControllerRotationRoll = false;
+
+	FollowCamera->SetActive(false, true);
+	FirstPersonCamera->SetActive(true, true);
+}
+
+void AThirdPersonMPCharacter::SetThirdPersonCamera()
+{
+	// Don't rotate when the controller rotates. Let that just affect the camera.
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+	
+	FirstPersonCamera->SetActive(false, true);
+	FollowCamera->SetActive(true, true);
+}
+
 void AThirdPersonMPCharacter::DoMove(const float Right, const float Forward)
 {
-	if (GetController() != nullptr)
+	if (GetController() == nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = GetController()->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		// add movement 
-		AddMovementInput(ForwardDirection, Forward);
-		AddMovementInput(RightDirection, Right);
+		return;
 	}
+	
+	// find out which way is forward
+	const FRotator Rotation = GetController()->GetControlRotation();
+	const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+	// get forward vector
+	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+	// get right vector 
+	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	// add movement 
+	AddMovementInput(ForwardDirection, Forward);
+	AddMovementInput(RightDirection, Right);
 }
 
 void AThirdPersonMPCharacter::DoLook(const float Yaw, const float Pitch)
 {
-	if (GetController() != nullptr)
+	if (GetController() == nullptr)
 	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
+		return;
 	}
+	// add yaw and pitch input to controller
+	AddControllerYawInput(Yaw);
+	AddControllerPitchInput(Pitch);
 }
 
 void AThirdPersonMPCharacter::DoJumpStart()

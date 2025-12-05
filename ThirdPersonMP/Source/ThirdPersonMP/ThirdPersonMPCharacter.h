@@ -23,16 +23,10 @@ class AThirdPersonMPCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	// Camera boom positioning the camera behind the character
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<USpringArmComponent> CameraBoom;
-
-	// Follow camera
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCameraComponent> FollowCamera;
-	
 public:
 	AThirdPersonMPCharacter();
+	
+	virtual void PostInitializeComponents() override;
 	
 	// Property replication
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
@@ -74,6 +68,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Health")
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 
+private:
+	// Camera boom positioning the camera behind the character
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USpringArmComponent> CameraBoom;
+
+	// Follow camera
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FollowCamera;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FirstPersonCamera;
+	
 protected:
 	static constexpr float DefaultMaxWalkSpeed = 500.0f;
 	static constexpr float SprintingMaxWalkSpeed = 1000.0f;
@@ -104,6 +110,9 @@ protected:
 	
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> OpenMenuAction;
+	
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> ToggleCameraAction;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Health")
 	float MaxHealth;
@@ -167,5 +176,11 @@ protected:
 	void OnHealthUpdate() const;
 	
 	void ToggleMenu();
+	
+	void ToggleCamera();
+	
+	void SetFirstPersonCamera();
+	
+	void SetThirdPersonCamera();
 };
 

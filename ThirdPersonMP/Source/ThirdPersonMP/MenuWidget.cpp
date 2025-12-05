@@ -3,7 +3,7 @@
 
 #include "MenuWidget.h"
 
-#include "ToolMenusEditor.h"
+// todo: move menu opening and closing implementation here and set UMenuWidget as parent of WBP_Menu
 
 void UMenuWidget::OpenMenu()
 {
