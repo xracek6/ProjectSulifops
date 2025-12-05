@@ -13,10 +13,8 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
-#include "MenuWidget.h"
 #include "ThirdPersonMP.h"
 #include "ThirdPersonMPPlayerController.h"
-#include "Blueprint/UserWidget.h"
 
 AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 {
@@ -236,7 +234,7 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 	// Client-specific functionality
 	if (IsLocallyControlled())
 	{
-		const FString HealthMessage = FString::Printf(TEXT("You now have %f remaining."), CurrentHealth);
+		const FString HealthMessage = FString::Printf(TEXT("You now have %f health remaining."), CurrentHealth);
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, HealthMessage);
 		
 		if (CurrentHealth <= 0)
@@ -261,40 +259,18 @@ void AThirdPersonMPCharacter::OnHealthUpdate() const
 
 void AThirdPersonMPCharacter::ToggleMenu()
 {
-	AThirdPersonMPPlayerController* MyController = Cast<AThirdPersonMPPlayerController>(GetController());
+	AThirdPersonMPPlayerController* MyController = GetController<AThirdPersonMPPlayerController>();
 	
 	if (MyController == nullptr)
 	{
-		const FString Message = FString::Printf(TEXT("Controller is null in AThirdPersonMPCharacter::OpenMenu()"));
+		UE_LOG(LogThirdPersonMP, Error, TEXT("Player Controller is null in AThirdPersonMPCharacter::ToggleMenu()"));
+		
+		const FString Message = FString(TEXT("Player Controller is null in AThirdPersonMPCharacter::ToggleMenu()"));
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
 		return;
 	}
-	
-	// const FString Message = FString::Printf(TEXT("Controller is valid in AThirdPersonMPCharacter::OpenMenu()"));
-	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
 
-	const TObjectPtr<UUserWidget> Menu = MyController->GetMenuWidget();
-	
-	if (Menu->IsInViewport())
-	{
-		Menu->RemoveFromParent();
-
-		FInputModeGameOnly GameInputMode;
-		MyController->SetInputMode(GameInputMode);
-		MyController->SetShowMouseCursor(false);
-		MyController->SetIgnoreMoveInput(false);
-		return;
-	}
-	
-	Menu->AddToViewport(0);
-	
-	FInputModeGameAndUI Mode;
-	Mode.SetWidgetToFocus(Menu->TakeWidget());
-	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	
-	MyController->SetIgnoreMoveInput(true);
-	MyController->SetInputMode(Mode);
-	MyController->SetShowMouseCursor(true);
+	MyController->ToggleMenu();
 }
 
 void AThirdPersonMPCharacter::ToggleCamera()

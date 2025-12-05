@@ -159,7 +159,6 @@ protected:
 	// A timer handle used for providing the fire rate delay in-between spawns.
 	FTimerHandle FiringTimer;
 	
-	// The player's maximum health. This is the highest value of their health can be. This value is a value of the player's health, which starts at when spawned.
 	UFUNCTION()
 	void OnRep_CurrentHealth() const;
 

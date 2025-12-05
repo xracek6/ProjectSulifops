@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MenuWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "ThirdPersonMPPlayerController.generated.h"
 
@@ -20,10 +19,14 @@ class AThirdPersonMPPlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
-	[[nodiscard]] TObjectPtr<UUserWidget> GetMenuWidget() const
-	{
-		return MenuWidget;
-	}
+	UFUNCTION(BlueprintCallable)
+	void ToggleMenu();
+	
+	UFUNCTION(BlueprintCallable)
+	void OpenMenu();
+	
+	UFUNCTION(BlueprintCallable)
+	void CloseMenu();
 
 protected:
 
@@ -40,6 +43,7 @@ protected:
 	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
 
 	/** Pointer to the mobile controls widget */
+	UPROPERTY()
 	TObjectPtr<UUserWidget> MobileControlsWidget;
 	
 	UPROPERTY(EditAnywhere, Category ="Menu")
