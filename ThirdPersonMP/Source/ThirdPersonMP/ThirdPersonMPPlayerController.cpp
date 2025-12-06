@@ -15,7 +15,7 @@ void AThirdPersonMPPlayerController::ToggleMenu()
 	{
 		UE_LOG(LogThirdPersonMP, Error, TEXT("Menu Widget is null in AThirdPersonMPPlayerController::ToggleMenu()"));
 		
-		const FString Message = FString(TEXT("Player Controller is null in AThirdPersonMPPlayerController::ToggleMenu()"));
+		const FString Message = FString(TEXT("Menu Widget is null in AThirdPersonMPPlayerController::ToggleMenu()"));
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Message);
 		return;
 	}
@@ -58,11 +58,14 @@ void AThirdPersonMPPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	MenuWidget = CreateWidget<UUserWidget>(this, MenuWidgetClass);
-	if (MenuWidget == nullptr)
+	if (IsLocalPlayerController())
 	{
-		UE_LOG(LogThirdPersonMP, Error, TEXT("Could not spawn MenuWidget in AThirdPersonMPPlayerController::BeginPlay()"));
-		return;
+		MenuWidget = CreateWidget<UUserWidget>(this, MenuWidgetClass);
+		if (MenuWidget == nullptr)
+		{
+			UE_LOG(LogThirdPersonMP, Error, TEXT("Could not spawn MenuWidget in AThirdPersonMPPlayerController::BeginPlay()"));
+			return;
+		}
 	}
 	
 	// only spawn touch controls on local player controllers

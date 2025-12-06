@@ -82,7 +82,7 @@ private:
 	
 protected:
 	static constexpr float DefaultMaxWalkSpeed = 500.0f;
-	static constexpr float SprintingMaxWalkSpeed = 1000.0f;
+	static constexpr float SprintingMaxWalkSpeed = 850.0f;
 
 	// Jump Input Action
 	UPROPERTY(EditAnywhere, Category="Input")
@@ -121,7 +121,7 @@ protected:
 	float CurrentHealth;
 	
 	UPROPERTY(EditDefaultsOnly, Category="Gameplay|Projectile")
-	TSubclassOf<class AThirdPersonMPProjectile> ProjectileClass;
+	TSubclassOf<class AProjectile> ProjectileClass;
 	
 	// Delay between shots in seconds. Used to control fire rate for your test projectile, but also to prevent an overflow of server functions from binding SpawnProjectile directly to input.
 	UPROPERTY(EditDefaultsOnly, Category="Gameplay")
@@ -140,7 +140,7 @@ protected:
 	
 	// Server function for spawning projectiles.
 	UFUNCTION(Server, Reliable)
-	void HandleFire();
+	void ServerRPCHandleFire();
 	
 	UFUNCTION(BlueprintCallable, Category="Gameplay")
 	void StartSprint();
@@ -149,10 +149,10 @@ protected:
 	void StopSprint();
 	
 	UFUNCTION(Server, Reliable)
-	void ServerStartSprint();
+	void ServerRPCStartSprint();
 	
 	UFUNCTION(Server, Reliable)
-	void ServerStopSprint();
+	void ServerRPCStopSprint();
 	
 	void SetMaxWalkSpeed(float MaxWalkSpeed) const;
 	

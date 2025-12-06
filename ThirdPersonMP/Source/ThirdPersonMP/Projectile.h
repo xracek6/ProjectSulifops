@@ -4,16 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "ThirdPersonMPProjectile.generated.h"
+#include "Projectile.generated.h"
 
 UCLASS()
-class THIRDPERSONMP_API AThirdPersonMPProjectile : public AActor
+class THIRDPERSONMP_API AProjectile : public AActor
 {
 	GENERATED_BODY()
 	
 public:	
 	// Sets default values for this actor's properties
-	AThirdPersonMPProjectile();
+	AProjectile();
 	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -31,11 +31,11 @@ public:
 	TObjectPtr<class UProjectileMovementComponent> ProjectileMovementComponent;
 	
 	// Particle used when the projectile impacts another object and explodes
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	TObjectPtr<class UParticleSystem> ExplosionEffect;
 	
 	// Sound effect that will play on projectile impact
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Effects")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Effects")
 	TObjectPtr<class USoundBase> SoundEffect;
 	
 	// Damage type that will be dealt by this projectile
@@ -53,4 +53,7 @@ protected:
 	
 	UFUNCTION(Category="Projectile")
 	void OnProjectileImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+	
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastRPCSpawnExplosion();
 };

@@ -1,7 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "ThirdPersonMPProjectile.h"
+#include "Projectile.h"
+#include "ThirdPersonMP.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -10,7 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 
-AThirdPersonMPProjectile::AThirdPersonMPProjectile()
+AProjectile::AProjectile()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -22,11 +23,12 @@ AThirdPersonMPProjectile::AThirdPersonMPProjectile()
 	SphereComponent->SetCollisionProfileName(TEXT("BlockAllDynamic"));
 	RootComponent = SphereComponent;
 
-	if (GetLocalRole() == ROLE_Authority)
+	if (HasAuthority())
 	{
-		SphereComponent->OnComponentHit.AddDynamic(this, &AThirdPersonMPProjectile::OnProjectileImpact);
+		SphereComponent->OnComponentHit.AddDynamic(this, &AProjectile::OnProjectileImpact);
 	}
 
+	// todo: this vs blueprint?
 	// Definition for the Mesh that will serve as visual representation of the projectile
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMesh(TEXT("/Game/StarterContent/Shapes/Shape_Sphere.Shape_Sphere"));
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
@@ -40,26 +42,28 @@ AThirdPersonMPProjectile::AThirdPersonMPProjectile()
 		StaticMeshComponent->SetRelativeScale3D(FVector(0.75f, 0.75f, 0.75f));
 	}
 
-	// Set explosion effect
-	static ConstructorHelpers::FObjectFinder<UParticleSystem> DefaultExplosionEffect(TEXT("/Game/StarterContent/Particles/P_Explosion.P_Explosion"));
-	if (DefaultExplosionEffect.Succeeded())
-	{
-		ExplosionEffect = DefaultExplosionEffect.Object;
-	}
+	// Explosion effect + sound effect is now set in derived blueprint (BP_Projectile)
 
-	// Set sound effect
-	static ConstructorHelpers::FObjectFinder<USoundWave> DefaultSoundEffect(TEXT("/Game/StarterContent/Audio/Explosion01.Explosion01"));
-	if (DefaultExplosionEffect.Succeeded())
-	{
-		// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, FString(TEXT("Successfully loaded sound effect")));
-		SoundEffect = DefaultSoundEffect.Object;
-	}
+	// // Set explosion effect
+	// static ConstructorHelpers::FObjectFinder<UParticleSystem> DefaultExplosionEffect(TEXT("/Game/StarterContent/Particles/P_Explosion.P_Explosion"));
+	// if (DefaultExplosionEffect.Succeeded())
+	// {
+	// 	ExplosionEffect = DefaultExplosionEffect.Object;
+	// }
+	//
+	// // Set sound effect
+	// static ConstructorHelpers::FObjectFinder<USoundWave> DefaultSoundEffect(TEXT("/Game/StarterContent/Audio/Explosion01.Explosion01"));
+	// if (DefaultSoundEffect.Succeeded())
+	// {
+	// 	// GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Red, FString(TEXT("Successfully loaded sound effect")));
+	// 	SoundEffect = DefaultSoundEffect.Object;
+	// }
 
 	// Definition for the ProjectileMovementComponent
 	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovementComponent->SetUpdatedComponent(SphereComponent);
-	ProjectileMovementComponent->InitialSpeed = 1500.0f;
-	ProjectileMovementComponent->MaxSpeed = 1500.0f;
+	ProjectileMovementComponent->InitialSpeed = 2000.0f;
+	ProjectileMovementComponent->MaxSpeed = 2000.0f;
 	ProjectileMovementComponent->bRotationFollowsVelocity = true;
 	ProjectileMovementComponent->ProjectileGravityScale = 0.0f;
 
@@ -69,24 +73,21 @@ AThirdPersonMPProjectile::AThirdPersonMPProjectile()
 }
 
 // Called when the game starts or when spawned
-void AThirdPersonMPProjectile::BeginPlay()
+void AProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 }
 
-void AThirdPersonMPProjectile::Destroyed()
+void AProjectile::Destroyed()
 {
-	const FVector SpawnLocation = GetActorLocation();
-	UGameplayStatics::SpawnEmitterAtLocation(this, ExplosionEffect, SpawnLocation, FRotator::ZeroRotator, true, EPSCPoolMethod::AutoRelease);
-	UGameplayStatics::PlaySoundAtLocation(this, SoundEffect, SpawnLocation);
-
+	MulticastRPCSpawnExplosion();
 	// const FString message = FString::Printf(TEXT("Local role in Destroyed: %d."), GetLocalRole());
 	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
 }
 
 // ReSharper disable once CppPassValueParameterByConstReference
-void AThirdPersonMPProjectile::OnProjectileImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-                                                  const FHitResult& Hit)
+void AProjectile::OnProjectileImpact(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse,
+                                     const FHitResult& Hit)
 {
 	// const FString message = FString::Printf(TEXT("Local role in OnProjectileImpact: %d."), GetLocalRole());
 	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
@@ -98,8 +99,28 @@ void AThirdPersonMPProjectile::OnProjectileImpact(UPrimitiveComponent* HitCompon
 	Destroy();
 }
 
+void AProjectile::MulticastRPCSpawnExplosion_Implementation()
+{
+	const UWorld* World = GetWorld();
+
+	if (World == nullptr)
+	{
+		UE_LOG(LogThirdPersonMP, Error, TEXT("GetWorld() returned nullptr in AProjectile::MulticastRPCSpawnExplosion_Implementation()"));
+		return;
+	}
+
+	// Don't spawn explosion or play sound effect on dedicated server
+	if (World->IsNetMode(NM_DedicatedServer))
+	{
+		return;
+	}
+
+	UGameplayStatics::SpawnEmitterAtLocation(this, ExplosionEffect, GetActorLocation(), FRotator::ZeroRotator, true, EPSCPoolMethod::AutoRelease);
+	UGameplayStatics::PlaySoundAtLocation(this, SoundEffect, GetActorLocation(), 0.5f);
+}
+
 // Called every frame
-void AThirdPersonMPProjectile::Tick(float DeltaTime)
+void AProjectile::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 }

@@ -8,7 +8,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/Engine.h"
-#include "ThirdPersonMPProjectile.h"
+#include "Projectile.h"
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -59,7 +59,8 @@ AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 	CurrentHealth = MaxHealth;
 	
 	// Initialize projectile class.
-	ProjectileClass = AThirdPersonMPProjectile::StaticClass();
+	// This should be set in BP_ThirdPersonMPCharacter
+	// ProjectileClass = AProjectile::StaticClass();
 	
 	// Initialize fire rate.
 	FireRate = 0.15f;
@@ -114,7 +115,7 @@ void AThirdPersonMPCharacter::StartFire()
 	bIsFiringWeapon = true;
 	const UWorld* World = GetWorld();
 	World->GetTimerManager().SetTimer(FiringTimer, this, &AThirdPersonMPCharacter::StopFire, FireRate, false);
-	HandleFire();
+	ServerRPCHandleFire();
 }
 
 void AThirdPersonMPCharacter::StopFire()
@@ -125,41 +126,51 @@ void AThirdPersonMPCharacter::StopFire()
 void AThirdPersonMPCharacter::StartSprint()
 {
 	SetMaxWalkSpeed(this->SprintingMaxWalkSpeed);
-	// todo: limit server calls
-	ServerStartSprint();
+	
+	// if this character has no authority, also start sprinting on server via rpc
+	if (!HasAuthority())
+	{
+		// todo: limit server calls with timer?
+		ServerRPCStartSprint();
+	}
 }
 
 void AThirdPersonMPCharacter::StopSprint()
 {
 	SetMaxWalkSpeed(this->DefaultMaxWalkSpeed);
-	// todo: limit server calls
-	ServerStopSprint();
+	
+	// if this character has no authority, also stop sprinting on server via rpc
+	if (!HasAuthority())
+	{
+		// todo: limit server calls with timer?
+		ServerRPCStopSprint();
+	}
 }
 
-void AThirdPersonMPCharacter::HandleFire_Implementation()
+void AThirdPersonMPCharacter::ServerRPCHandleFire_Implementation()
 {
 	// const FString message = FString::Printf(TEXT("Local role in HandleFire: %d."), GetLocalRole());
 	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
 
-	const FVector SpawnLocation = GetActorLocation() + (GetActorRotation().Vector()  * 100.0f) + (GetActorUpVector() * 50.0f);
-	const FRotator SpawnRotation = GetActorRotation();
+	FVector SpawnLocation = GetActorLocation() + (GetActorRotation().Vector()  * 100.0f) + (GetActorUpVector() * 50.0f);
+	FRotator SpawnRotation = GetActorRotation();
 	
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Instigator = GetInstigator();
 	SpawnParameters.Owner = this;
 
-	[[maybe_unused]] AThirdPersonMPProjectile* spawnedProjectile = GetWorld()->SpawnActor<AThirdPersonMPProjectile>(SpawnLocation, SpawnRotation, SpawnParameters);
+	[[maybe_unused]] AProjectile* spawnedProjectile = GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParameters);
 }
 
 
-void AThirdPersonMPCharacter::ServerStartSprint_Implementation()
+void AThirdPersonMPCharacter::ServerRPCStartSprint_Implementation()
 {
 	// const FString message = FString::Printf(TEXT("Local role in ServerStartSprint: %d."), GetLocalRole());
 	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
 	SetMaxWalkSpeed(SprintingMaxWalkSpeed);
 }
 
-void AThirdPersonMPCharacter::ServerStopSprint_Implementation()
+void AThirdPersonMPCharacter::ServerRPCStopSprint_Implementation()
 {
 	// const FString message = FString::Printf(TEXT("Local role in ServerStopSprint: %d."), GetLocalRole());
 	// GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, message);
@@ -282,7 +293,7 @@ void AThirdPersonMPCharacter::SetFirstPersonCamera()
 {
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
-	bUseControllerRotationRoll = false;
+	bUseControllerRotationRoll = true;
 
 	FollowCamera->SetActive(false, true);
 	FirstPersonCamera->SetActive(true, true);
@@ -347,7 +358,7 @@ void AThirdPersonMPCharacter::DoJumpEnd()
 
 void AThirdPersonMPCharacter::SetCurrentHealth(const float HealthValue)
 {
-	if (GetLocalRole() == ROLE_Authority)
+	if (HasAuthority())
 	{ 
 		CurrentHealth = FMath::Clamp(HealthValue, 0.0f, MaxHealth);
 		OnHealthUpdate();
