@@ -114,6 +114,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> ToggleCameraAction;
 	
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> SpawnStaticMeshActorAction;
+	
 	UPROPERTY(EditDefaultsOnly, Category="Health")
 	float MaxHealth;
 	
@@ -129,6 +132,12 @@ protected:
 	
 	// If true, character is in process of firing projectiles.
 	bool bIsFiringWeapon;
+	
+	UPROPERTY(EditAnywhere, Category="Gameplay")
+	TObjectPtr<UStaticMesh> StaticMeshToSpawn;
+	
+	UPROPERTY(EditAnywhere, Category="Gameplay")
+	TObjectPtr<UMaterial> StaticMeshMaterial;
 	
 	// Function for beginning weapon fire.
 	UFUNCTION(BlueprintCallable, Category="Gameplay")
@@ -153,6 +162,9 @@ protected:
 	
 	UFUNCTION(Server, Reliable)
 	void ServerRPCStopSprint();
+	
+	UFUNCTION(Server, Unreliable)
+	void ServerRPCSpawnStaticMeshActor();
 	
 	void SetMaxWalkSpeed(float MaxWalkSpeed) const;
 	
@@ -181,5 +193,7 @@ protected:
 	void SetFirstPersonCamera();
 	
 	void SetThirdPersonCamera();
+	
+	void SpawnStaticMeshActor();
 };
 

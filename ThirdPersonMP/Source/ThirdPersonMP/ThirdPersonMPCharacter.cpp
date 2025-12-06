@@ -15,6 +15,7 @@
 #include "InputActionValue.h"
 #include "ThirdPersonMP.h"
 #include "ThirdPersonMPPlayerController.h"
+#include "Engine/StaticMeshActor.h"
 
 AThirdPersonMPCharacter::AThirdPersonMPCharacter()
 {
@@ -177,6 +178,50 @@ void AThirdPersonMPCharacter::ServerRPCStopSprint_Implementation()
 	SetMaxWalkSpeed(DefaultMaxWalkSpeed);
 }
 
+void AThirdPersonMPCharacter::ServerRPCSpawnStaticMeshActor_Implementation()
+{
+	if (StaticMeshToSpawn == nullptr)
+	{
+		UE_LOG(LogThirdPersonMP, Error, TEXT("Unable to spawn Static Mesh Actor in AThirdPersonMPCharacter::ServerRPCSpawnStaticMeshActor_Implementation() as StaticMeshToSpawn is nullptr"));
+		return;
+	}
+	
+	AStaticMeshActor* StaticMeshActor = GetWorld()->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass());
+	if (StaticMeshActor == nullptr)
+	{
+		UE_LOG(LogThirdPersonMP, Error, TEXT("StaticMeshActor is nullptr in AThirdPersonMPCharacter::ServerRPCSpawnStaticMeshActor_Implementation()"));
+		return;
+	}
+	
+	StaticMeshActor->SetReplicates(true);
+	StaticMeshActor->SetReplicateMovement(true);
+	StaticMeshActor->SetMobility(EComponentMobility::Movable);
+	
+	// Spawn location set to 300 units in front and 100 units above the current character location
+	FVector SpawnLocation = GetActorLocation() + GetActorRotation().Vector() * 300.0f + GetActorUpVector() * 100.0f;
+	StaticMeshActor->SetActorLocation(SpawnLocation);
+
+	UStaticMeshComponent* StaticMeshComponent = StaticMeshActor->GetStaticMeshComponent();
+	if (StaticMeshComponent == nullptr)
+	{
+		UE_LOG(LogThirdPersonMP, Error, TEXT("StaticMeshComponent is nullptr in AThirdPersonMPCharacter::ServerRPCSpawnStaticMeshActor_Implementation()"));
+		return;
+	}
+	
+	StaticMeshComponent->SetIsReplicated(true);
+	StaticMeshComponent->SetSimulatePhysics(true);
+	
+	if (StaticMeshMaterial == nullptr)
+	{
+		UE_LOG(LogThirdPersonMP, Error, TEXT("StaticMeshMaterial is nullptr in AThirdPersonMPCharacter::ServerRPCSpawnStaticMeshActor_Implementation()"));
+	} else
+	{
+		StaticMeshComponent->SetMaterial(0, StaticMeshMaterial);
+	}
+	
+	StaticMeshComponent->SetStaticMesh(StaticMeshToSpawn);
+}
+
 void AThirdPersonMPCharacter::SetMaxWalkSpeed(const float MaxWalkSpeed) const
 {
 	GetCharacterMovement()->MaxWalkSpeed = MaxWalkSpeed;
@@ -215,6 +260,9 @@ void AThirdPersonMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		
 		// Camera toggle
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::ToggleCamera);
+		
+		// Spawn static mesh actor
+		EnhancedInputComponent->BindAction(SpawnStaticMeshActorAction, ETriggerEvent::Triggered, this, &AThirdPersonMPCharacter::SpawnStaticMeshActor);
 	}
 	else
 	{
@@ -308,6 +356,13 @@ void AThirdPersonMPCharacter::SetThirdPersonCamera()
 	
 	FirstPersonCamera->SetActive(false, true);
 	FollowCamera->SetActive(true, true);
+}
+
+void AThirdPersonMPCharacter::SpawnStaticMeshActor()
+{
+	// todo: limit server calls
+	// todo: move spawning to separate class?
+	ServerRPCSpawnStaticMeshActor();
 }
 
 void AThirdPersonMPCharacter::DoMove(const float Right, const float Forward)
